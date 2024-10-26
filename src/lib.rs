@@ -42,7 +42,7 @@ impl App {
             .build()
             .expect("Failed to initialize display Canvas");
         let background_rect = Rect::from_center(
-            Point::new((SCREEN_WIDTH / 2) as i32, (SCREEN_HEIGHT / 2) as i32),
+            Point::new((SCREEN_WIDTH / 2) as i32, (SCREEN_HEIGHT / 2 + 10) as i32),
             SCREEN_WIDTH,
             SCREEN_HEIGHT,
         );
