@@ -1,31 +1,34 @@
 use crate::entity::Entity;
+use crate::resource_manager::ResManager;
 use rand::Rng;
 use sdl2::event::*;
-use sdl2::image::LoadTexture;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
+use sdl2::rect::Point;
+use sdl2::rect::Rect;
 use sdl2::render::*;
 use sdl2::sys::SDL_Quit;
 use sdl2::video::*;
 use sdl2::EventPump;
 use std::collections::VecDeque;
 
-mod entity;
+pub mod entity;
+pub mod resource_manager;
 
 const SCREEN_WIDTH: u32 = 1280;
 const SCREEN_HEIGHT: u32 = 720;
 
 pub struct App {
-    display: Canvas<Window>,
+    pub display: Canvas<Window>,
     event_pump: EventPump,
     player: Option<Entity>,
     columns: VecDeque<Entity>,
+    background_rect: Rect,
 }
 
 impl App {
     pub fn init() -> Self {
         let context = sdl2::init().expect("Failed to initialize SDL2");
-
         let window = context
             .video()
             .unwrap()
@@ -38,11 +41,11 @@ impl App {
             .into_canvas()
             .build()
             .expect("Failed to initialize display Canvas");
-
-        let texture_creator = display.texture_creator();
-        let background = texture_creator
-            .load_texture("resources/background.png")
-            .unwrap();
+        let background_rect = Rect::from_center(
+            Point::new((SCREEN_WIDTH / 2) as i32, (SCREEN_HEIGHT / 2) as i32),
+            SCREEN_WIDTH,
+            SCREEN_HEIGHT,
+        );
 
         let event_pump = context
             .event_pump()
@@ -57,6 +60,7 @@ impl App {
             event_pump,
             player,
             columns,
+            background_rect,
         }
     }
 
@@ -85,12 +89,10 @@ impl App {
     }
 
     pub fn process_logic(&mut self, delta_time: f64) {
-        // update player positon
         if let Some(ent) = &mut self.player {
             ent.update_position(delta_time);
         }
 
-        // update columns position
         let mut updated_columns: VecDeque<Entity> = VecDeque::new();
         for column in self.columns.iter_mut() {
             column.update_position(delta_time);
@@ -102,7 +104,6 @@ impl App {
             }
         }
 
-        // check for player colison with columns
         if let Some(ent) = &mut self.player {
             for i in 0..5 {
                 let column_ref = updated_columns.get(i as usize).unwrap();
@@ -113,14 +114,12 @@ impl App {
             }
         }
 
-        // check if player has fallen down
         if let Some(ent) = &mut self.player {
             if ent.rect.top() > SCREEN_HEIGHT as i32 {
                 self.player = None;
             }
         }
 
-        // generate columns if needed
         let boundary = SCREEN_WIDTH + updated_columns.back().unwrap().rect.width() / 2;
         if updated_columns.back().unwrap().x < boundary as f64 {
             updated_columns.append(&mut Self::create_columns())
@@ -128,19 +127,31 @@ impl App {
         self.columns = updated_columns;
     }
 
-    pub fn render_display(&mut self) {
-        self.display.set_draw_color(Color::RGB(255, 255, 255));
+    pub fn render_display(&mut self, res_manager: &ResManager) {
+        self.display.set_draw_color(Color::RGB(173, 216, 230));
         self.display.clear();
 
-        self.draw_entities();
+        let texture = res_manager.get_texture("background");
+        self.display
+            .copy_ex(texture, None, self.background_rect, 0.0, None, false, false)
+            .unwrap();
+
+        self.draw_entities(res_manager);
 
         self.display.present();
     }
 
-    fn draw_entities(&mut self) {
+    fn draw_entities(&mut self, res_manager: &ResManager) {
         if let Some(player) = &mut self.player {
-            self.display.set_draw_color(Color::RGB(255, 0, 0));
-            self.display.fill_rect(player.rect).unwrap();
+            let player_texture = res_manager.get_texture("flappy_bird");
+            let sprite_rect = Rect::from_center(
+                player.rect.center(),
+                player.rect.width() + 40,
+                player.rect.height() + 30,
+            );
+            self.display
+                .copy_ex(player_texture, None, sprite_rect, 0.0, None, false, false)
+                .unwrap();
         }
 
         for column in self.columns.iter_mut() {
